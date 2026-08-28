@@ -3,3 +3,4 @@ SysWatt.app
 .DS_Store
 .openchrome/
 dump.log
+dist/

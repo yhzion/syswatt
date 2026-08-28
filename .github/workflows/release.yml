@@ -1,0 +1,67 @@
+name: Release
+
+# vX.Y.Z 태그를 밀면 도망가지 않고 DMG 를 만들어 배포한다.
+# 버전은 태그 이름이 아니라 VERSION 파일이 정하므로, 둘이 어긋나면 여기서 죽인다.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode toolchain
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Check tag matches VERSION
+        run: |
+          V="$(tr -d '[:space:]' <VERSION)"
+          echo "VERSION=v$V  TAG=${GITHUB_REF_NAME}"
+          if [ "v$V" != "${GITHUB_REF_NAME}" ]; then
+              echo "::error::태그 ${GITHUB_REF_NAME} 가 VERSION v$V 와 다르다"
+              exit 1
+          fi
+
+      - name: Build and verify DMG
+        run: ./scripts/make-dmg.sh
+
+      # CHANGELOG 에서 이번 릴리스에 해당하는 마디만 잘라 발행 메시지로 쓴다.
+      # 표준 형식은 "## 0.1.0 (2026-08-28)" 이므로 접두 문자열로 잡는다.
+      - name: Collect release notes
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          awk -v v="$V" 'index($0, "## " v " ")==1 {f=1; next} /^## / {f=0} f' CHANGELOG.md >notes.md
+          echo "--- notes ---"
+          cat notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.dmg.sha256 \
+              --title "SysWatt ${GITHUB_REF_NAME#v}" \
+              --notes-file notes.md
+
+      # Developer ID 인증서와 공증(notary) 자격이 생기면 아래를 활성화한다.
+      # 그러면 make-dmg.sh 의 서명 단계도 인증서로 바꿔야 하고, 받는 사람이
+      # quarantine 를 손으로 풀 필요가 없어진다. 지금은 자격이 없어 미검증 단계다.
+      #
+      # - name: Notarize and staple
+      #   env:
+      #     APPLE_ID: ${{ secrets.APPLE_ID }}
+      #     APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      #     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      #   run: |
+      #     xcrun notarytool submit dist/*.dmg \
+      #       --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" \
+      #       --team-id "$APPLE_TEAM_ID" --wait
+      #     xcrun stapler staple dist/*.dmg
