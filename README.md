@@ -164,6 +164,36 @@ The system "Edit Widgets" mode hides this window on purpose. It is a normal
 panel, not a WidgetKit widget, so the edit layer covers it and it reappears when
 you leave that mode.
 
+## Development
+
+```bash
+./scripts/install-hooks.sh
+```
+
+The hooks live in `scripts/git-hooks` and `install-hooks.sh` points
+`core.hooksPath` at them, because `.git/hooks` is not version controlled. On a
+commit that touches Swift, `pre-commit` runs `swift format lint --strict` and a
+release build with warnings promoted to errors; `commit-msg` requires a
+Conventional Commit subject, since that subject is the data source for the
+generated changelog. Both checks are mirrored in CI, so `--no-verify` moves the
+failure to the pull request rather than hiding it.
+
+Formatting is enforced by the `swift-format` that ships in the toolchain, so the
+gate costs no extra install. `.swift-format` keeps 4-space indentation and sets
+the line length to 140 on purpose: at 100 columns the same tool rewrites 1,669
+lines of this source tree, at 120 it rewrites 129, and at 140 the whole codebase
+settled in 108 lines.
+
+```bash
+swift format -r -i Sources                          # apply
+swift format lint -r -p --strict Sources            # check
+swift build -c release -Xswiftc -warnings-as-errors # the gate the hook runs
+```
+
+A release build is not paranoia here. A `[weak self]` reference inside a `Task`
+compiled clean in debug, linked in debug, ran in debug, and failed only in
+release, so `swift build` alone is not a useful pre-commit check.
+
 ## Diagnostics
 
 ```bash

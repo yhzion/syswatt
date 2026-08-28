@@ -1,0 +1,31 @@
+#!/bin/bash
+# Conventional Commits 제목 검증.
+#
+# 이게 곧 데이터 스키마입니다: CHANGELOG.md 는 커밋 제목에서 생성되고,
+#버전은 type 으로 결정됩니다 (feat → minor, fix/perf → patch, ! → major).
+# 형식이 깨진 커밋은 CHANGELOG 에서 사라지거나 버전 계산을 틀리게 합니다.
+set -euo pipefail
+
+title=$(head -1 "$1")
+
+case "$title" in
+    Merge* | Revert* | fixup!* | squash!*) exit 0 ;;
+esac
+
+# scope 은 한글을 허용한다 (fix(위젯): ... ). 빈칸과 중괄호는 제외.
+pattern='^(feat|fix|perf|refactor|docs|style|test|build|ci|chore|revert)(\([^ ()]+\))?!?: [^ ].{2,}'
+
+if ! printf '%s' "$title" | grep -qE "$pattern"; then
+    cat >&2 <<'MSG'
+커밋 제목이 Conventional Commits 형식이 아닙니다.
+
+  형식:  type(scope)?: 한 줄 설명
+  허용:  feat fix perf refactor docs style test build ci chore revert
+  예:    fix(위젯): 크기 재조정 후 좌표가 어긋나는 문제
+         feat: 배터리 유입 방향 표시
+
+본문은 3줄 이상 남기고, 40자 안에서 줄바꿈하며 한 줄 띄고 URL 을 적습니다.
+우회하려면: git commit --no-verify
+MSG
+    exit 1
+fi

@@ -1,0 +1,32 @@
+#!/bin/bash
+# 커밋 직전 게이트: 서식 + release 빌드(경고를 에러로 취급).
+#
+# 왜 release 빌드인가: [weak self]를 Task 안에서 바로 닿은 코드는 debug 빌드가
+# 통과하고 release 빌드만 실패했다. 로컬에서 못 보고 CI에서 빨간 걸 본 부류다.
+#
+# 왜 스테이징 파일이 아니라 Sources 전체를 보는가: 한 파일의 일부만_stage_하면
+# 파일 전체 서식이 아니면 검사할 수 없어서다. git add -p 로 잘라 staged 한 뒤
+# 이 훅을 쓰면 전체 파일 기준으로 판단하니 주의.
+#
+# 우회: --no-verify . 같은 검사는 Actions(build.yml)에도 거울로 있어서 PR 에서 막힌다.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.swift$'; then
+    exit 0
+fi
+
+echo "pre-commit: swift-format 검사"
+if ! swift format lint -r -p --strict Sources; then
+    echo
+    echo "서식이 맞지 않습니다. 다음을 실행한 뒤 다시 커밋하세요."
+    echo "  swift format -r -i Sources"
+    exit 1
+fi
+
+echo "pre-commit: release 빌드"
+if ! swift build -c release -Xswiftc -warnings-as-errors; then
+    echo
+    echo "빌드 실패. debug 만으로는 모르고 넘어가는 에러가 있습니다."
+    exit 1
+fi

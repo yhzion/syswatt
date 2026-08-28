@@ -126,3 +126,30 @@ package-app.sh                       # release 빌드 + .app 번들링 + ad-hoc 
 - **사설 API 리스크**: IOReport·SMC 는 공개 API가 아니다. macOS 메이저 업그레이드에서
   시그니처/키 이름이 바뀌면 깨질 수 있다. `Sources/CIOReport/include/CIOReport.h` 가
   유일한 선언 파일이라 거기서 잡는다.
+
+## 개발 환경
+
+```bash
+./scripts/install-hooks.sh
+```
+
+훅은 `scripts/git-hooks`에 있고 `core.hooksPath`로 연결합니다(`.git/hooks`는 버전 관리가
+안 되므로). Swift 을 건드리는 커밋에서 `pre-commit`이 `swift format lint --strict` 와
+경고를 에러로 올린 release 빌드를 돌리고, `commit-msg`은 Conventional Commits 제목을
+요구합니다 — 그 제목이 CHANGELOG 생성의 원데이터이기 때문입니다. 두 검사는 CI 에도
+거울로 있어 `--no-verify` 로 우회하면 실패가 PR 로 옮겨갈 뿐 숨겨지지 않습니다.
+
+서식은 툴체인에 들어있는 `swift-format`이 봅니다(SwiftLint 는 별도 설치라 뺐습니다).
+`.swift-format` 의 140열은 감으로 고른 숫자가 아닙니다. 같은 도구를 100열에 걸면 이
+소스 트리에서 1,669줄이 다시 쓰이고, 120열에서 129줄, 140열에서 108줄로 정리됩니다.
+
+```bash
+swift format -r -i Sources                          # 적용
+swift format lint -r -p --strict Sources            # 검사
+swift build -c release -Xswiftc -warnings-as-errors # 훅이 돌리는 실제 게이트
+```
+
+release 빌드는 억지가 아닙니다. `Task` 안의 `[weak self]` 참조는 debug 에서 컴파일·링크·
+실행까지 다 되다가 release 에서만 실패했습니다. `swift build` 한 줄은 pre-commit 검사로
+충분하지 않다는 뜻입니다.
+
