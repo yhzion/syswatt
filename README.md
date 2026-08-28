@@ -89,14 +89,20 @@ the battery is discharging while plugged in.
 <br>
 <table>
   <tr>
-    <td><img src="docs/assets/widget-charging.png" alt="Widget charging: 12.4W headline with a green up arrow and 19.2W wall input" width="330"></td>
-    <td><img src="docs/assets/widget-reverse.png" alt="Widget with orange down arrow: battery discharging through a 20W adapter" width="330"></td>
+    <td><img src="docs/assets/widget-charging.png" alt="Widget charging: 12.4W headline with a green up arrow and 19.2W wall input" width="240"></td>
+    <td><img src="docs/assets/widget-reverse.png" alt="Widget with orange down arrow: battery discharging through a 20W adapter" width="240"></td>
+    <td><img src="docs/assets/widget-battery.png" alt="Widget on battery: only the headline, bar and per-component labels" width="240"></td>
   </tr>
   <tr>
     <td><sub>Charging — energy into the battery.</sub></td>
     <td><sub>Reverse flow — the adapter cannot cover consumption.</sub></td>
+    <td><sub>On battery — the row is gone, and the panel is one row shorter.</sub></td>
   </tr>
 </table>
+
+The third capture is the reason the widget resizes instead of blanking: with the
+adapter unplugged there is no input power to state, so the row leaves and the
+window drops from 220x129 to 220x99 with its top edge pinned.
 <br>
 <img src="docs/assets/menubar.png" alt="Menu bar item showing watts" width="200">
 </details>

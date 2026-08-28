@@ -186,3 +186,14 @@ SHA-256 를 GitHub Release 에 올린다. `make-dmg.sh` 는 방금 만든 이미
 
 0.1.0 태그만 손으로 만들었다. `standard-version@9` 가 `--first-release` 와 함께면 annotated 태그
 생성에서 죽는다.
+
+## 실측 캡처
+
+| 상태 | 창 크기 | 표시 |
+|---|---|---|
+| 충전 | 220x129 | 헤드라인 + 바 + 전력 행 + 초록 ▲ (`docs/assets/widget-charging.png`) |
+| 역류(20W 어댑터에 8코어 부하) | 220x129 | 같은 자리에서 주황 ▼ (`docs/assets/widget-reverse.png`) |
+| 배터리 | 220x99 | 전력 행 자체가 사라진다 (`docs/assets/widget-battery.png`) |
+
+행이 숨는 것과 창이 줄어드는 것은 별개가 아니라 인과다. 위쪽 가장자리를 고정 한 채
+한 행 분량(30pt)만 덜어내기 때문에, 어댑터를 다시 꽂으면 위젯이 그 자리에서 다시 자란다.
