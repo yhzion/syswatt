@@ -3,17 +3,17 @@ import IOKit
 
 /// 배터리로 흐르는 방향
 enum BatteryFlow: Equatable {
-    case charging   // 어댑터에 여유가 있음
-    case idle       // 만충 등 유입·유출 없음
-    case reverse    // 어댑터 정격이 소비에 못 맞춰 배터리가 토해냄
+    case charging  // 어댑터에 여유가 있음
+    case idle  // 만충 등 유입·유출 없음
+    case reverse  // 어댑터 정격이 소비에 못 맞춰 배터리가 토해냄
 }
 
 /// 어댑터/배터리 측 전력 (AppleSmartBattery IORegistry, 60초 틱으로 갱신됨)
 struct PowerInput: Equatable {
-    var wattsIn: Double         // 벽 → Mac 유입 (W)
-    var batteryWatts: Double    // + 충전 / − 방전 (W)
-    var adapterWatts: Int?      // 어댑터 정격 (W)
-    var sampleAge: TimeInterval // 마지막 값 변화 후 경과 초
+    var wattsIn: Double  // 벽 → Mac 유입 (W)
+    var batteryWatts: Double  // + 충전 / − 방전 (W)
+    var adapterWatts: Int?  // 어댑터 정격 (W)
+    var sampleAge: TimeInterval  // 마지막 값 변화 후 경과 초
 
     /// 0.15W 데드존: 계측 지터로 화살표가 깜빡이는 것을 막는다.
     var flow: BatteryFlow {
@@ -47,7 +47,7 @@ final class PowerInputReader {
         if service == IO_OBJECT_NULL {
             service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         }
-        guard service != IO_OBJECT_NULL else {   // 배터리 없는 Mac (mini/Studio)
+        guard service != IO_OBJECT_NULL else {  // 배터리 없는 Mac (mini/Studio)
             onUpdate?(nil)
             return
         }
@@ -66,14 +66,14 @@ final class PowerInputReader {
         }
 
         let tele = p["PowerTelemetryData"] as? [String: Any] ?? [:]
-        let rawWattsIn = Self.int64(tele["SystemPowerIn"])            // mW
+        let rawWattsIn = Self.int64(tele["SystemPowerIn"])  // mW
         if rawWattsIn != lastRawWattsIn {
             lastRawWattsIn = rawWattsIn
             lastChange = Date()
         }
 
-        let volts = Self.int64(p["Voltage"])                          // mV
-        let amps = Self.int64(p["InstantAmperage"])                   // mA (방전은 음수)
+        let volts = Self.int64(p["Voltage"])  // mV
+        let amps = Self.int64(p["InstantAmperage"])  // mA (방전은 음수)
         let input = PowerInput(
             wattsIn: Double(rawWattsIn) / 1_000,
             batteryWatts: Double(amps * volts) / 1_000_000,
@@ -87,7 +87,8 @@ final class PowerInputReader {
         guard service != IO_OBJECT_NULL else { return nil }
         var props: Unmanaged<CFMutableDictionary>?
         guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-              let dict = props?.takeRetainedValue() as? [String: Any] else { return nil }
+            let dict = props?.takeRetainedValue() as? [String: Any]
+        else { return nil }
         return dict
     }
 

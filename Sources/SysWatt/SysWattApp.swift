@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 // MARK: - 설정 상수
 
@@ -24,7 +24,7 @@ enum LaunchAgent {
             "Label": "com.yhzion.syswatt",
             "ProgramArguments": [exec],
             "RunAtLoad": true,
-            "KeepAlive": false
+            "KeepAlive": false,
         ]
         guard let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0) else { return }
         let url = URL(fileURLWithPath: plistPath)
@@ -166,7 +166,7 @@ struct PowerBar: View {
             let ane = metrics?.anePower ?? 0
             let sys = max(metrics?.sysPower ?? 0, 0.001)
             let parts: [(Double, Color)] = [
-                (cpu, .blue), (gpu, .green), (ram, .orange), (ane, .purple)
+                (cpu, .blue), (gpu, .green), (ram, .orange), (ane, .purple),
             ]
             HStack(spacing: 1) {
                 ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
@@ -316,7 +316,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyPanelLevel()
 
         if let saved = defaults.dictionary(forKey: Key.panelOrigin),
-           let x = saved["x"] as? Double, let y = saved["y"] as? Double {
+            let x = saved["x"] as? Double, let y = saved["y"] as? Double
+        {
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         } else {
             defaultOrigin()
@@ -348,7 +349,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyPanelLevel() {
         // 기본: 벽지 바로 위(데스크탑). "항상 위에" 켜면 일반 창 위.
-        panel.level = defaults.bool(forKey: Key.pinOnTop)
+        panel.level =
+            defaults.bool(forKey: Key.pinOnTop)
             ? .floating
             : NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
     }
@@ -437,11 +439,13 @@ enum PowerDump {
                 let flow: String
                 switch i.flow {
                 case .charging: flow = "▲ 유입"
-                case .reverse:  flow = "▼ 유출(정격 부족)"
-                case .idle:     flow = "− 유지"
+                case .reverse: flow = "▼ 유출(정격 부족)"
+                case .idle: flow = "− 유지"
                 }
-                print(String(format: "  입력 ≈%.1fW · %@ %@ %.1fW · %.0f초 전 측정", i.wattsIn, flow,
-                             i.adapterWatts.map { "(\($0)W 어댑터)" } ?? "", abs(i.batteryWatts), i.sampleAge))
+                print(
+                    String(
+                        format: "  입력 ≈%.1fW · %@ %@ %.1fW · %.0f초 전 측정", i.wattsIn, flow,
+                        i.adapterWatts.map { "(\($0)W 어댑터)" } ?? "", abs(i.batteryWatts), i.sampleAge))
                 fflush(stdout)
             } else {
                 print("  입력 없음 (배터리 전용)")
@@ -449,9 +453,10 @@ enum PowerDump {
             }
         }
         sampler.onUpdate = { m in
-            print("\(fmt.string(from: Date()))  sys=\(String(format: "%.1f", m.sysPower))W  "
-                + "cpu=\(String(format: "%.1f", m.cpuPower)) gpu=\(String(format: "%.1f", m.gpuPower)) "
-                + "ram=\(String(format: "%.1f", m.ramPower)) temp=\(m.cpuTemp.map { String(format: "%.0f°C", $0) } ?? "-")")
+            print(
+                "\(fmt.string(from: Date()))  sys=\(String(format: "%.1f", m.sysPower))W  "
+                    + "cpu=\(String(format: "%.1f", m.cpuPower)) gpu=\(String(format: "%.1f", m.gpuPower)) "
+                    + "ram=\(String(format: "%.1f", m.ramPower)) temp=\(m.cpuTemp.map { String(format: "%.0f°C", $0) } ?? "-")")
             fflush(stdout)
         }
         sampler.onError = { e in

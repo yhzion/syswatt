@@ -1,5 +1,5 @@
-import Foundation
 import CSmc
+import Foundation
 
 /// SMC를 통째로 스캔해서, CPU 부하를 주는 전/후 값이 같이 오르는 키가 뭔지 찾아낸다.
 /// (`--temps` 진단용. 온도 키 이름은 칩마다 다르다.)

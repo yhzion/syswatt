@@ -1,15 +1,15 @@
-import Foundation
-import CoreFoundation
 import CIOReport
+import CoreFoundation
+import Foundation
 
 /// SoC 부품별 소비 전력. 필드 이름이 같으면 UI 는 그대로 쓴다.
 struct PowerMetrics {
-    var sysPower: Double     // 시스템 전체 (SMC PSTR)
+    var sysPower: Double  // 시스템 전체 (SMC PSTR)
     var cpuPower: Double
     var gpuPower: Double
     var ramPower: Double
     var anePower: Double
-    var cpuTemp: Double?     // 가장 뜨거운 CPU 센서 (SMC "Tp*")
+    var cpuTemp: Double?  // 가장 뜨거운 CPU 센서 (SMC "Tp*")
 }
 
 /// "Energy Model" 채널은 누적 에너지(mJ/uJ/nJ)를 준다. 두 스냅샷의 델타를
@@ -79,21 +79,25 @@ final class EnergyModel {
         guard let baseline = previous else { return nil }
         let elapsed = now - baseline.at
         guard elapsed > 0.05,
-              let delta = IOReportCreateSamplesDelta(baseline.samples, current, nil)?.takeRetainedValue(),
-              let array = Self.channelArray(of: delta) else { return nil }
+            let delta = IOReportCreateSamplesDelta(baseline.samples, current, nil)?.takeRetainedValue(),
+            let array = Self.channelArray(of: delta)
+        else { return nil }
 
-        var cpu = 0.0, gpu = 0.0, ane = 0.0, ram = 0.0
+        var cpu = 0.0
+        var gpu = 0.0
+        var ane = 0.0
+        var ram = 0.0
         for item in Self.items(of: array) {
             guard Self.text(IOReportChannelGetGroup(item)) == "Energy Model" else { continue }
             let name = Self.text(IOReportChannelGetChannelName(item))
             guard let scale = Self.unitScale(Self.text(IOReportChannelGetUnitLabel(item))) else { continue }
             let watts = Double(IOReportSimpleGetIntegerValue(item, 0)) / elapsed / scale
 
-            if name.hasSuffix("CPU Energy") {        // Ultra 는 "DIE_0_CPU Energy"
+            if name.hasSuffix("CPU Energy") {  // Ultra 는 "DIE_0_CPU Energy"
                 cpu += watts
             } else if name == "GPU Energy" {
                 gpu += watts
-            } else if name.hasPrefix("ANE") {        // Basic "ANE", Max "ANE0"
+            } else if name.hasPrefix("ANE") {  // Basic "ANE", Max "ANE0"
                 ane += watts
             } else if name.hasPrefix("DRAM") {
                 ram += watts
@@ -206,7 +210,7 @@ final class PowerSampler {
         // M 시리즈에서 "Tp*" 계열이 프로세서 접합부 온도다. 키 이름은 칩마다 달라서
         // 접두어로열거하고, 매 tick 그중 최고값을 쓴다.
         tempKeys = smc?.keys(prefixedBy: "Tp") ?? []
-        _ = energy?.powers()   // 기준선 확보 → 첫 tick 부터 1초 구간값
+        _ = energy?.powers()  // 기준선 확보 → 첫 tick 부터 1초 구간값
 
         let source = DispatchSource.makeTimerSource(queue: queue)
         source.schedule(deadline: .now() + 1, repeating: 1.0)
@@ -226,13 +230,13 @@ final class PowerSampler {
 
     private func tick() {
         guard let p = energy?.powers() else { return }
-        let package = p.cpu + p.gpu + p.ane     // SoC 안에서 측정된 합
-        let board = smc?.float("PSTR") ?? 0     // 보드 단위 측정치
-        onUpdate?(PowerMetrics(
-            sysPower: max(board, package),      // PSTR 없는 기종 대비
-            cpuPower: p.cpu, gpuPower: p.gpu, ramPower: p.ram, anePower: p.ane,
-            cpuTemp: hottestTemp()
-        ))
+        let package = p.cpu + p.gpu + p.ane  // SoC 안에서 측정된 합
+        let board = smc?.float("PSTR") ?? 0  // 보드 단위 측정치
+        onUpdate?(
+            PowerMetrics(
+                sysPower: max(board, package),  // PSTR 없는 기종 대비
+                cpuPower: p.cpu, gpuPower: p.gpu, ramPower: p.ram, anePower: p.ane,
+                cpuTemp: hottestTemp()
+            ))
     }
 }
-

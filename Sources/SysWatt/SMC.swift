@@ -1,6 +1,6 @@
+import CSmc
 import Foundation
 import IOKit
-import CSmc
 
 /// AppleSMC 를 읽는 가장 단순한 경로. `IOConnectCallStructMethod`(index 2) 하나만 씁니다.
 /// 읽기 전용이라 root 권한이 필요 없습니다.
@@ -70,7 +70,7 @@ final class SMC {
             &output, &outSize
         )
         guard kr == KERN_SUCCESS else { return false }
-        return output.result == 0        // 132 는 "키 없음"
+        return output.result == 0  // 132 는 "키 없음"
     }
 
     private static func keyID(_ name: String) -> UInt32? {
@@ -108,9 +108,9 @@ extension SMC {
 
     struct Reading {
         var key: String
-        var type: String     // FourCC: "sp78", "flt ", "fpe2" …
+        var type: String  // FourCC: "sp78", "flt ", "fpe2" …
         var bytes: [UInt8]
-        var value: Double?   // 타입을 해석했을 때의 실수값
+        var value: Double?  // 타입을 해석했을 때의 실수값
     }
 
     /// 키 이름으로 원시 값 + 타입을 읽고, 알려진 수치 타입은 실수로 해석한다.
@@ -144,9 +144,9 @@ extension SMC {
         switch rawType.trimmingCharacters(in: .whitespaces) {
         case "flt" where bytes.count >= 4:
             return Double(Float(bitPattern: UInt32(bytes[0]) | UInt32(bytes[1]) << 8 | UInt32(bytes[2]) << 16 | UInt32(bytes[3]) << 24))
-        case "sp78" where bytes.count >= 2:      // 부호 있는 8.8 고정소수점 (big-endian)
+        case "sp78" where bytes.count >= 2:  // 부호 있는 8.8 고정소수점 (big-endian)
             return Double(Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))) / 256.0
-        case "fpe2" where bytes.count >= 2:      // 부호 없는 14.2
+        case "fpe2" where bytes.count >= 2:  // 부호 없는 14.2
             return Double(UInt16(bytes[0]) << 8 | UInt16(bytes[1])) / 4.0
         case "iio" where bytes.count >= 4:
             return Double(Int32(bitPattern: Self.u32BE(bytes)))
