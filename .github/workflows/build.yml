@@ -28,7 +28,7 @@ jobs:
       - name: Format check
         run: swift format lint -r -p --strict Sources
 
-      # debug 빌드는 이 부류를 경고로 넘기고 release 에서만 에러로落と는다.
+      # debug 빌드는 이 부류를 경고로 넘기고 release 에서만 에러로 떨어뜨린다.
       # 그래서 CI 는 항상 release + warnings-as-errors 로 게이트를 선다.
       - name: Build
         run: swift build -c release -Xswiftc -warnings-as-errors
