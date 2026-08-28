@@ -269,7 +269,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func scheduleRepositionEnd(after seconds: TimeInterval) {
         repositionTimer?.invalidate()
         repositionTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.endRepositioning() }
+            // release 빌드에서는 [weak self]를 Task 안에서 바로 닿으면
+            // "captured var in concurrently-executing code" 로 에러가 난다.
+            guard let self else { return }
+            Task { @MainActor in self.endRepositioning() }
         }
     }
 

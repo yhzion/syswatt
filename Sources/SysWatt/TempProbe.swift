@@ -44,7 +44,6 @@ enum TempProbe {
     }
 
     private static func spinCores(for seconds: TimeInterval) {
-        let gate = DispatchSemaphore(value: 0)
         let stop = Date().addingTimeInterval(seconds)
         let group = DispatchGroup()
         for _ in 0..<ProcessInfo.processInfo.activeProcessorCount {
@@ -54,7 +53,6 @@ enum TempProbe {
                 while Date() < stop { _ = (1...300_000).reduce(0, +) }
             }
         }
-        gate.wait(timeout: .now() + seconds)
         group.wait()
     }
 }

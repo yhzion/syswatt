@@ -12,8 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # debug 빌드는 이 부류를 경고로 넘기고 release 에서만 에러로落と는다.
+      # 그래서 CI 는 항상 release + warnings-as-errors 로 게이트를 선다.
       - name: Build
-        run: swift build -c release
+        run: swift build -c release -Xswiftc -warnings-as-errors
 
       - name: Package app bundle
         run: ./package-app.sh
