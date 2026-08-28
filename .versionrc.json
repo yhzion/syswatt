@@ -1,0 +1,14 @@
+{
+  "packageFiles": [
+    { "filename": "VERSION", "type": "plain-text" }
+  ],
+  "bumpFiles": [
+    { "filename": "VERSION", "type": "plain-text" }
+  ],
+  "header": "# CHANGELOG\n\n버전은 시멘틱 버저닝을 따른다. `VERSION` 파일이 단일 진실이고, 릴리스는 `vX.Y.Z` 태그다.\n항목은 커밋 제목에서 생성되므로 `commit-msg` 훅의 Conventional Commits 검증이 곧 이 파일의 스키마다.\n",
+  "types": [
+    { "type": "feat", "section": "Added" },
+    { "type": "fix", "section": "Fixed" },
+    { "type": "perf", "section": "Improved" }
+  ]
+}
