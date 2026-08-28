@@ -1,125 +1,232 @@
-# SysWatt
+<p align="center">
+  <img src="docs/assets/icon.png" alt="SysWatt icon" width="96">
+</p>
 
-> macOS 실시간 소비 전력을 상태바와 데스크탑 위젯에. 1초 갱신, root 불필요, 서브프로세스 없음.
->
-> *A macOS menu bar + desktop widget that shows live power draw (watts) from IOReport & AppleSMC.*
+<h1 align="center">SysWatt</h1>
 
-Mac의 실시간 소비 전력(W)을 **상태바**와 **데스크탑 위젯**에 표시하는 메뉴바 앱.
+<p align="center">
+  Live Mac power draw in the menu bar and on the desktop, measured in watts.
+</p>
 
-- 데이터: 전부 인프로세스. 외부 바이너리·서브프로세스 없음
-  - 부품별 전력: `IOReport` "Energy Model" 채널 (비공개 C API, `/usr/lib/libIOReport.dylib`)
-  - 시스템 전력: `AppleSMC` 키 `PSTR` (`IOConnectCallStructMethod`)
-  - 입력/충전 전력: `AppleSmartBattery` IORegistry 속성
-- 갱신: 소비전력 1초 · 입력/충전전력 **60초 틱** (macOS가 그 주기로만 준다)
-- root 불필요. 표시 값 `sys_power = max(PSTR, cpu+gpu+ane)`
+<p align="center">
+  <a href="https://github.com/yhzion/syswatt/actions/workflows/build.yml"><img src="https://github.com/yhzion/syswatt/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <img src="https://img.shields.io/badge/version-0.1.0-5066E8" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.9 or newer">
+  <img src="https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white" alt="macOS 14 or newer">
+  <img src="https://img.shields.io/badge/Apple_Silicon-only-4B5563" alt="Apple Silicon only">
+  <img src="https://img.shields.io/badge/sudo-not_required-2EA043" alt="sudo not required">
+  <img src="https://img.shields.io/badge/license-MIT-3178C6" alt="MIT license">
+</p>
 
-## 계측 소스 실측 결과
+<p align="center">
+  <img src="docs/assets/readme-hero.png" alt="Concept artwork of a desktop widget connected to a wall outlet" width="100%">
+</p>
 
-| 값 | 출처 | 갱신 주기 |
-|---|---|---|
-| `PSTR` 시스템 전력 (W) | AppleSMC 키 | 1초 |
-| `CPU/GPU/ANE/DRAM Energy` (누적 mJ/uJ/nJ) | IOReport Energy Model | 1초 |
-| `SystemPowerIn` 벽→Mac 유입 (mW) | `PowerTelemetryData` | **60초** |
-| `InstantAmperage × Voltage` 충전(+)·방전(−) | `AppleSmartBattery` | **60초** |
-| `AdapterDetails.Watts` 어댑터 정격 | `AppleSmartBattery` | 고정 |
-| `ExternalConnected` 어댑터 연결 여부 | `AppleSmartBattery` | 연결 이벤트 시 **즉시**(실측 2~4초 내) |
+<p align="center"><sub>Concept artwork. Real captures of the shipped interface are in <a href="#preview">Preview</a>.</sub></p>
 
- 항등식 확인됨: `SystemPowerIn = SystemLoad + BatteryPower` (19.05 = 5.85 + 13.2).
- 다만 ioreg `SystemLoad`(유휴 5.9W)와 macmon `sys_power`(유휴 12.2W)는 측정 범위가 달라서,
- **소비치 + 충전치로 입력을 유도 계산하면 과대계산**된다. 그래서 입력은 계측값을 그대로 쓴다.
+SysWatt reads the machine's own power counters once per second and shows two
+numbers: what the Mac is consuming now, and — while an adapter is attached — how
+much is arriving from the wall. There is no helper daemon, no shell-out, no
+network traffic, and no elevated privileges. Everything is read in-process
+through `IOReport` and `AppleSMC`.
 
-> 콘센트에서 실제로 빨아들이는 wall watt가 아닙니다. 디스플레이·SSD·팬·충전 손실이 일부만 반영된
-> 추정치라 `≈`로 씁니다. 정확한 wall watt는 스마트 플러그 측 외부 계량기가 필요합니다.
+## At a glance
 
-## 설치
+| Surface | V1 behavior |
+|---|---|
+| Menu bar | One status item, `⚡︎12.4W`, refreshed every second |
+| Desktop widget | Translucent panel pinned just above the wallpaper, with the same number plus a per-component bar, `CPU` / `GPU` split and the hottest CPU sensor |
+| Power row | Appears only while an adapter is connected: wall input, battery direction, and the age of that measurement |
+| Battery flow | Green `▲` for energy into the battery, orange `▼` for energy out of it, nothing at all when neither |
+| Polling | One in-process sampler at a fixed 1-second cadence; no child processes |
+| Position | Drag it anywhere; the frame is stored and restored |
+
+> [!NOTE]
+> The headline number is a machine estimate of system power, not the wattage at
+> the wall socket. Switching losses, and parts of the display, SSD and fan load,
+> are outside what macOS exposes. Apple Silicon only. Menu and widget labels are
+> currently Korean.
+
+## How it works
+
+```text
+IOReport "Energy Model"            cumulative mJ / uJ / nJ per block
+        │  samples → delta ÷ elapsed
+        ▼
+PowerSampler ─────────────────────▶ cpu · gpu · ane · ram        (1 s)
+        ▲
+AppleSMC key "PSTR" ──────────────▶ system power, board-wide     (1 s)
+        │
+        └── sys_power = max(PSTR, cpu + gpu + ane)
+                    │
+                    ├──▶ NSStatusItem title
+                    └──▶ NSPanel at desktop window level
+
+AppleSmartBattery (IORegistry)     updated by the OS about every 60 s
+        │  ExternalConnected gates the whole row
+        └──▶ SystemPowerIn · InstantAmperage × Voltage · AdapterDetails.Watts
+```
+
+Two measurement domains with different refresh rates are deliberately kept apart
+in the interface: the consumption number is one second old, the wall number can
+be up to a minute old, so the row prints its own age (`· 42초`). Deriving input
+power from `sys_power + battery flow` would look more responsive and would be
+wrong, because the two meters cover different loads.
+
+The identity `SystemPowerIn = SystemLoad + BatteryPower` was verified on this
+machine, and under a full-core load `wall input + battery discharge` reproduced
+the independent `sys_power` reading to within 1 W.
+
+## Preview
+
+Captures are taken from the running app: the widget as a single window and the
+menu bar item cropped to its exact accessibility frame. The second image is the
+undersized-adapter case — a 20 W charger on an M2 Max under eight busy cores, so
+the battery is discharging while plugged in.
+
+<details>
+<summary><strong>Open the real interface</strong></summary>
+<br>
+<table>
+  <tr>
+    <td><img src="docs/assets/widget-charging.png" alt="Widget charging: 12.4W headline with a green up arrow and 19.2W wall input" width="330"></td>
+    <td><img src="docs/assets/widget-reverse.png" alt="Widget with orange down arrow: battery discharging through a 20W adapter" width="330"></td>
+  </tr>
+  <tr>
+    <td><sub>Charging — energy into the battery.</sub></td>
+    <td><sub>Reverse flow — the adapter cannot cover consumption.</sub></td>
+  </tr>
+</table>
+<br>
+<img src="docs/assets/menubar.png" alt="Menu bar item showing watts" width="200">
+</details>
+
+## Requirements
+
+- macOS 14 or newer on Apple Silicon (M1 through M4 family; M5 not tested)
+- Xcode or the Swift toolchain, only to build from source
+- No sudo, no Full Disk Access, no network access
+
+`IOReport` and `AppleSMC` are read directly. The declarations for the
+non-public `IOReport` C functions live in one file,
+`Sources/CIOReport/include/CIOReport.h`, which is where you look first if a
+future macOS release changes them.
+
+## Build and install
 
 ```bash
-./package-app.sh             # SysWatt.app 생성
+git clone https://github.com/yhzion/syswatt
+cd syswatt
+swift build -c release
+./package-app.sh
 open SysWatt.app
 ```
 
-`시작 시 실행`은 상태바 메뉴로 켠다. LaunchAgent는 `.app` 경로가 아니라 **내부 실행 파일**을
-가리켜야 한다(launchd는 번들 디렉터리를 실행 못 함 — `EX_CONFIG`(78)으로 조용히 죽는다).
+`package-app.sh` assembles `SysWatt.app`, writes an `Info.plist` with
+`LSUIElement` set, and ad-hoc code-signs the bundle. The app lives in the menu
+bar only; there is no Dock tile.
 
-## 사용
-
-| 동작 | 방법 |
-|---|---|
-| 와트 확인 | 상태바 `⚡︎12.4W` / 데스크탑 위젯 |
-| 위젯 위치 | 메뉴 → `위치 조정` 후 드래그 |
-| 위치 초기화 | 메뉴 → `위젯 위치 초기화` (사과마크 바로 아래) |
-| 항상 위에 | 메뉴 → `항상 위에` (끄면 벽지 바로 위로 내려감) |
-| 위젯 숨김 | 메뉴 → `위젯 보기` |
-| 상세 | 위젯에 CPU/GPU 소비전력, 구성 비율 막대 |
-| 입력/충전 전력 | 어댑터를 꽂은 동안만 위젯 하단 전원 행 표시, 뽑으면 행이 사라지며 높이도 줄어듦 |
-
-### 왜 `위치 조정` 모드가 필요한가
-
-위젯은 기본이 **데스크탑 레벨** 창이다. 이 층에서는 마우스 히트테스트를 Finder가 가져버려
-드래그가 전혀 동작하지 않는다(실측: 데스크탑 레벨 이동량 0px, floating 레벨 80px).
-그래서 조정 중에만 창을 floating으로 올리고, 손을 띤 2초 뒤(아무 조작이 없으면 20초 뒤) 다시 내린다.
-
-데스크탑 우클릭 → **위젯 편집** 모드에서 이 위젯이 사라지는 것은 버그가 아니다. 시스템 위젯이
-아니라 일반 창이라 편집 모드 레이어에 가려지는 것일 뿐, 모드를 나오면 돌아온다.
-
-전원 행은 `🔌 ≈19.2W`(벽 유입) · 방향 화살표 · 우측 `· 42초`(데이터 나이) 세 부분이다.
-나이를 붙인 이유는 값이 60초 틱이라, 안 붙이면 "지금 입력"으로 오해되기 때문이다.
-플러그 아이콘 툴팁에는 어댑터 정격(`20W 어댑터 연결 중`)이 뜬다.
-
-### 배터리 흐름 화살표
-
-| 표시 | 의미 |
-|---|---|
-| ▲ 초록 | 배터리로 유입(충전) — 어댑터에 여유가 있음 |
-| ▼ 주황 | 배터리로 유출 — **어댑터 정격이 소비를 못 따라옴** |
-| (없음) | 만충 등 유입·유출 없음 |
-
-헤드라인의 볼트는 이미 "소비 전력"이라 충전 기호로 재사용하지 않았다.
-역류는 어댑터를 작게 쓸 때 보인다(실측: 20W 어댑터 + 8코어 풀로드 → 벽 19.1W + 배터리 44.9W = 64W,
-macmon `sys_power` 63.3W와 일치).
-
-## 진단
+Start at login is a menu item, not an assumption. It writes an ordinary user
+`LaunchAgent`, which needs no administrator privileges, pointing at the
+executable **inside** the bundle — `launchd` cannot start an `.app` directory and
+fails with `EX_CONFIG` (78) if you try:
 
 ```bash
-.build/debug/syswatt --dump      # GUI 없이 5초간 와트를 터미널에 출력
-.build/debug/syswatt --channels  # 이 기기의 IOReport Energy Model 채널 목록
+~/Library/LaunchAgents/com.yhzion.syswatt.plist
 ```
 
-다른 Apple Silicon(M1~M4/Ultra)에서도 채널 이름 규칙은 같다(`*CPU Energy`, `GPU Energy`,
-`ANE*`, `DRAM*`). 이상하면 `--channels`로 실제 이름/단위를 확인한다.
+Because that entry stores an absolute path, toggle the item off and on again
+after moving the app.
 
-macmon을 개발 중 검증 도구로 쓸 수 있다(의존성은 없다):
+## Display behavior
+
+- The headline is `sys_power`: `PSTR` when the SMC exposes it, otherwise the sum
+  of the measured SoC blocks.
+- The segmented bar under the number is not decoration. Each segment is one
+  power domain scaled against the same total, so a blue-only bar means CPU-bound
+  and a violet tail means the neural engine is working.
+- The power row disappears entirely on battery, and the window shrinks by one
+  row while keeping its top edge fixed.
+- The adapter rating (`AdapterDetails.Watts`) is the charger's ceiling, not a
+  measurement, so it is only reachable from the plug icon's tooltip.
+- Energy Model channel names vary by chip (`CPU Energy` versus
+  `DIE_0_CPU Energy`, `ANE` versus `ANE0`), so matching is by prefix and suffix
+  rather than exact name.
+
+## Moving the widget
+
+A window at desktop window level does not receive mouse events — Finder owns
+hit-testing on the desktop — so dragging it is impossible in the default state.
+The menu's position command raises the panel to a floating level, lets you drag
+it, and returns it to the desktop level a moment after you release the mouse.
+
+The system "Edit Widgets" mode hides this window on purpose. It is a normal
+panel, not a WidgetKit widget, so the edit layer covers it and it reappears when
+you leave that mode.
+
+## Diagnostics
 
 ```bash
-brew install macmon        # 검증 전용. 앱은 macmon 을 찾지 않는다
-macmon pipe -i 1000        # 한 창에서
-# 다른 창에서 .build/debug/syswatt --dump  → 초 단위 값 비교
-```
-M2 Max 실측(8코어 부하): `sys` 64.6W vs 64.6W(오차 0.0%), `cpu` 41.2 vs 41.1W(0.2%).
-
-macmon 경로는 우선순위: `$POWER_WIDGET_MACMON` → 앱 번들 `Contents/Resources/macmon` → `/opt/homebrew/bin/macmon` → `/usr/local/bin/macmon`
-
-## 구조
-
-```
-Package.swift
-Sources/
-  CIOReport/include/CIOReport.h      # 비공개 IOReport 10개 함수 선언 (-lIOReport)
-  CSmc/include/CSmc.h                # AppleSMC KeyData 구조체 + 요청 헬퍼
-  SysWatt/
-    SysWattApp.swift                 # ViewModel / 상태바 / 데스크탑 패널 / 메뉴 / LaunchAgent
-    PowerSampler.swift               # Energy Model 델타 → 부품별 W, PSTR → 시스템 W (1초)
-    PowerInput.swift                 # AppleSmartBattery → 입력/충전 전력 + 어댑터 게이팅
-    SMC.swift                        # AppleSMC 읽기 전용 클라이언트 (키 열거/디코딩 포함)
-    TempProbe.swift                  # --temps: 칩별 온도 키 탐색 진단
-package-app.sh                       # release 빌드 + .app 번들링 + ad-hoc 서명
+.build/release/syswatt --dump      # print watts for 5 seconds, no GUI
+.build/release/syswatt --channels  # list this chip's Energy Model channels
+.build/release/syswatt --temps     # find CPU temperature keys by load response
 ```
 
-### 아직 안 된 것
+`--temps` scans every SMC key, spins all cores for eight seconds and reports
+which sensors rose the most. On an M2 Max the `Tp*` family climbs about 35 °C
+under load, which is why the widget shows the maximum of that family. If your
+chip disagrees, this is the command that tells you.
 
-- **CPU 온도**: 예전엔 macmon이 IOHID 센서로 읽던 값이다. 네이티브 전환에서 빠졌고
-  위젯에서는 자동으로 안 보인다(`PowerMetrics.cpuTemp` 가 nil). SMC 온도 키(`sp78` 타입)를
-  읽는 경로로 되살릴 수 있다.
-- **사설 API 리스크**: IOReport·SMC 는 공개 API가 아니다. macOS 메이저 업그레이드에서
-  시그니처/키 이름이 바뀌면 깨질 수 있다. `Sources/CIOReport/include/CIOReport.h` 가
-  유일한 선언 파일이라 거기서 잡는다.
+Measured on an M2 Max while running: 2.5% CPU at idle, 1.3% under an eight-core
+load, roughly 85 MB resident, 408 KB on disk. An earlier revision animated the
+headline digits; that alone cost 41% CPU, so the number updates plainly.
+
+## Cross-check against macmon
+
+[macmon](https://github.com/vladkens/macmon) is an independent implementation of
+the same counters. Sampled per second under an eight-core load:
+
+| Metric | macmon | SysWatt | deviation |
+|---|---|---|---|
+| `sys_power` | 64.6 W | 64.6 W | 0.0% |
+| `cpu_power` | 41.2 W | 41.1 W | 0.2% |
+| `gpu_power` | 1.0 W | 1.1 W | within sensor noise |
+
+macmon is not a dependency and the app never invokes it; it is only a reference
+for verification.
+
+## Security and privacy model
+
+- The app opens no sockets and resolves no DNS. There is no update checker and no
+  analytics.
+- It reads only system telemetry; it never enumerates files, processes or
+  windows that belong to you.
+- All counters are read in-process. Nothing is written to disk except its own
+  `UserDefaults` (widget position, preferences) and an optional `LaunchAgent`
+  you enable yourself.
+- It requires no root and no Full Disk Access. `IOReport` and `AppleSMC` reads
+  are available to ordinary user processes.
+- The build is ad-hoc signed. If you download a prebuilt copy rather than build
+  it, macOS may quarantine it until you approve the app.
+
+## Known limits
+
+- Wall wattage is not observable from software on this hardware. For the real
+  number at the socket, meter the outlet.
+- The wall input and battery numbers refresh on the OS's roughly 60-second
+  telemetry tick, whatever the widget's own cadence.
+- Only `PSTR`-style SMC keys and the Apple Silicon Energy Model are handled.
+  Intel Macs and Macs without a battery show no power row at all.
+- Non-public APIs can change with any macOS release. The failure mode is visible:
+  the menu bar item falls back to `⚡︎–`.
+
+## Documentation
+
+- [한국어 README](README.ko.md) — same content, plus the measurement log in Korean
+- [Build script](package-app.sh)
+- [IOReport declarations](Sources/CIOReport/include/CIOReport.h)
+- [SMC struct and decoding](Sources/CSmc/include/CSmc.h)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

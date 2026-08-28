@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Package app bundle
+        run: ./package-app.sh
+
+      # CI Mac 은 가상머신인 경우가 많아 SMC / Energy Model 이 없을 수 있다.
+      # 그래서 센서 조회는 참고 정보로만 남기고 게이트로 쓰지 않는다.
+      - name: Sensor probe (informational)
+        continue-on-error: true
+        run: ./.build/release/syswatt --channels
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SysWatt
+          path: SysWatt.app
+          if-no-files-found: error
