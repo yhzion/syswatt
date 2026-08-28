@@ -17,19 +17,42 @@ enum LaunchAgent {
 
     static var isEnabled: Bool { FileManager.default.fileExists(atPath: plistPath) }
 
-    static func enable() {
+    /// 영구적인 자리에 설치되지 않은 사본인지 본다. 두 갈래다.
+    ///
+    /// - `/Volumes/…` : DMG 를 마운트한 채로 실행한 경우. eject 하면 경로가 사라진다.
+    /// - `/AppTranslocation/…` : Gatekeeper 가 격리된 사본을 임의의 읽기 전용 경로로
+    ///   옮겨 실행한 경우. 재부팅 뒤 그 경로는 없다.
+    ///
+    /// 여기에 적어둔 LaunchAgent 는 조용히 죽은 로그인 항목으로 남는다. macOS 26.6
+    /// 실측: 격리 속성을 붙인 ad-hoc 사본은 translocate 는 되지만 `_dyld_start` 에서
+    /// 멈춰 코드가 한 줄도 돌지 않는다(그래서 화면에 아무것도 안 뜨고 `open` 은 0 을
+    /// 반환한다). 반면 격리 없는 사본을 DMG 안에서 바로 실행하면 `/Volumes` 경로가
+    /// 그대로 박힌다 — 아래 첫 갈래가 오늘 실제로 검증한 경로다.
+    static var runsFromTemporaryVolume: Bool {
+        let path = Bundle.main.bundlePath
+        return path.hasPrefix("/Volumes/") || path.contains("/AppTranslocation/")
+    }
+
+    @discardableResult
+    static func enable() -> Bool {
+        guard !runsFromTemporaryVolume else { return false }
         // launchd는 .app 디렉터리를 실행할 수 없다(EX_CONFIG) — 내부 실행 파일을 직접 가리킨다.
-        guard let exec = Bundle.main.executableURL?.path else { return }
+        guard let exec = Bundle.main.executableURL?.path else { return false }
         let plist: [String: Any] = [
             "Label": "com.yhzion.syswatt",
             "ProgramArguments": [exec],
             "RunAtLoad": true,
             "KeepAlive": false,
         ]
-        guard let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0) else { return }
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0) else { return false }
         let url = URL(fileURLWithPath: plistPath)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url)
+        do {
+            try data.write(to: url)
+            return true
+        } catch {
+            return false
+        }
     }
 
     static func disable() { try? FileManager.default.removeItem(atPath: plistPath) }
@@ -290,7 +313,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleLaunchAgent() {
-        LaunchAgent.isEnabled ? LaunchAgent.disable() : LaunchAgent.enable()
+        if LaunchAgent.isEnabled {
+            LaunchAgent.disable()
+            return
+        }
+        if !LaunchAgent.enable() {
+            // 저장을 거부한 사실을 알리지 않으면 사용자는 켜진 줄 안다.
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = "Applications 에 설치한 뒤 다시 시도하세요"
+            alert.informativeText = """
+                지금 실행 중인 사본이 DMG 나 임시 읽기 전용 경로에 있다. 거기 있는 경로는
+                언마운트 · 재부팅 뒤에 사라지므로 시작 시 실행을 저장하지 않았다.
+                SysWatt.app 을 Applications 로 드래그한 뒤 다시 켜세요.
+                """
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
     }
 
     // MARK: 데스크탑 패널

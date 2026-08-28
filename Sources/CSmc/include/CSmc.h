@@ -84,7 +84,7 @@ static inline PWKeyData pwRequestReadBytes(uint32_t key, PWKeyInfo info) {
     return d;
 }
 
-/*읽은 바이트를 little-endian float로 (PSTR等单位) */
+/*읽은 바이트를 little-endian float로 (PSTR 등) */
 static inline float pwFloatValue(const PWKeyData *d) {
     float f = 0.0f;
     memcpy(&f, d->bytes, 4);
