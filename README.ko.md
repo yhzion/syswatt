@@ -35,7 +35,21 @@ Mac의 실시간 소비 전력(W)을 **상태바**와 **데스크탑 위젯**에
 
 ## 설치
 
+[최신 릴리스](https://github.com/yhzion/syswatt/releases/latest)의 DMG 를 열어 `SysWatt.app`을
+`Applications`에 드래그하면 끝난다. 번들은 ad-hoc 서명이고 공증(notarize)은 Apple Developer ID 가
+있어야 하니, 내려받은 사본에는 quarantine 이 걸려 Gatekeeper 가 한 번 막는다. 처음에만 우클릭 →
+열기를 고르거나 속성을 지운다.
+
 ```bash
+xattr -dr com.apple.quarantine /Applications/SysWatt.app
+```
+
+직접 빌리면 이 교환이 필요 없다.
+
+```bash
+git clone https://github.com/yhzion/syswatt
+cd syswatt
+swift build -c release
 ./package-app.sh             # SysWatt.app 생성
 open SysWatt.app
 ```
@@ -153,3 +167,22 @@ release 빌드는 억지가 아닙니다. `Task` 안의 `[weak self]` 참조는 
 실행까지 다 되다가 release 에서만 실패했습니다. `swift build` 한 줄은 pre-commit 검사로
 충분하지 않다는 뜻입니다.
 
+## 릴리스
+
+```bash
+npx standard-version                 # VERSION 올림 + CHANGELOG + 커밋 + 태그
+git push --follow-tags origin main
+```
+
+버전은 커밋 제목에서 나온다. 그래서 `commit-msg` 훅이 Conventional Commits 를 강제한다 —
+`feat` 은 마이너, `fix` 와 `perf` 는 패치, `!` 나 `BREAKING CHANGE` 는 메이저. `CHANGELOG.md` 에
+실리는 형식은 저 셋뿐이고 `docs`·`style`·`ci`·`chore` 는 의도적으로 빠진다. 오타 수정 커밋이
+릴리스처럼 보이는 일을 막는다.
+
+`vX.Y.Z` 태그를 밀면 `release.yml` 이 돈다. 태그와 `VERSION` 이 같은지 확인하고,
+`scripts/make-dmg.sh` 를 돌리고, `CHANGELOG.md` 에서 이번 마디만 잘라 메시지로 쓰고, DMG 와
+SHA-256 를 GitHub Release 에 올린다. `make-dmg.sh` 는 방금 만든 이미지를 직접 마운트해서 서명을
+검증하고 안의 실행 파일을 돌려본다 — 실행 안 되는 산출물이 릴리스가 되면 안 되니까.
+
+0.1.0 태그만 손으로 만들었다. `standard-version@9` 가 `--first-release` 와 함께면 annotated 태그
+생성에서 죽는다.

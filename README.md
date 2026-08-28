@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/yhzion/syswatt/actions/workflows/build.yml"><img src="https://github.com/yhzion/syswatt/actions/workflows/build.yml/badge.svg" alt="Build"></a>
-  <img src="https://img.shields.io/badge/version-0.1.0-5066E8" alt="Version 0.1.0">
+  <a href="https://github.com/yhzion/syswatt/releases/latest"><img src="https://img.shields.io/github/v/tag/yhzion/syswatt?label=release&sort=semver&color=5066E8" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.9 or newer">
   <img src="https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white" alt="macOS 14 or newer">
   <img src="https://img.shields.io/badge/Apple_Silicon-only-4B5563" alt="Apple Silicon only">
@@ -112,7 +112,19 @@ non-public `IOReport` C functions live in one file,
 `Sources/CIOReport/include/CIOReport.h`, which is where you look first if a
 future macOS release changes them.
 
-## Build and install
+## Install
+
+Grab the DMG from the [latest release](https://github.com/yhzion/syswatt/releases/latest),
+open it and drag `SysWatt.app` onto `Applications`. The bundle is ad-hoc signed
+and notarization needs an Apple Developer ID nobody here holds, so macOS
+quarantines a downloaded copy and Gatekeeper refuses it once. Right-click and
+choose Open the first time, or clear the attribute:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SysWatt.app
+```
+
+Building from source skips that exchange entirely:
 
 ```bash
 git clone https://github.com/yhzion/syswatt
@@ -194,6 +206,28 @@ A release build is not paranoia here. A `[weak self]` reference inside a `Task`
 compiled clean in debug, linked in debug, ran in debug, and failed only in
 release, so `swift build` alone is not a useful pre-commit check.
 
+## Releasing
+
+```bash
+npx standard-version                 # VERSION bump + CHANGELOG + commit + tag
+git push --follow-tags origin main
+```
+
+Version numbers come from commit subjects, which is why `commit-msg` enforces
+Conventional Commits: `feat` takes the minor, `fix` and `perf` the patch, `!` or
+`BREAKING CHANGE` the major. Only those three types reach `CHANGELOG.md`, so
+`docs`, `style`, `ci` and `chore` commits never masquerade as a release.
+
+Pushing a `vX.Y.Z` tag runs `release.yml`: it checks the tag against `VERSION`,
+runs `scripts/make-dmg.sh`, cuts this version's section out of `CHANGELOG.md` and
+publishes a GitHub Release carrying the DMG together with its SHA-256.
+`make-dmg.sh` mounts the image it just wrote, verifies the signature and executes
+the binary inside it, which is the point — an artifact that cannot launch should
+not become a release.
+
+The 0.1.0 tag was created by hand instead: `standard-version@9` fails to make the
+annotated tag when combined with `--first-release`.
+
 ## Diagnostics
 
 ```bash
@@ -253,6 +287,8 @@ for verification.
 ## Documentation
 
 - [한국어 README](README.ko.md) — same content, plus the measurement log in Korean
+- [CHANGELOG](CHANGELOG.md) — generated from commit subjects
+- [Release workflow](.github/workflows/release.yml)
 - [Build script](package-app.sh)
 - [IOReport declarations](Sources/CIOReport/include/CIOReport.h)
 - [SMC struct and decoding](Sources/CSmc/include/CSmc.h)
