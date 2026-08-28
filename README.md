@@ -121,16 +121,29 @@ future macOS release changes them.
 ## Install
 
 Grab the DMG from the [latest release](https://github.com/yhzion/syswatt/releases/latest),
-open it and drag `SysWatt.app` onto `Applications`. The bundle is ad-hoc signed
-and notarization needs an Apple Developer ID nobody here holds, so macOS
-quarantines a downloaded copy and Gatekeeper refuses it once. Right-click and
-choose Open the first time, or clear the attribute:
+open it, drag `SysWatt.app` onto `Applications`, and run it from there — not from
+the mounted image.
+
+The bundle is ad-hoc signed, and notarization needs an Apple Developer ID nobody
+here holds. That combination does not produce the old "unidentified developer"
+dialog on current macOS. Measured on 26.6: a quarantined copy is moved to a
+temporary read-only path, `open` exits 0, and the process never gets past
+`_dyld_start` with no binary images loaded, so **nothing appears on screen at
+all**. Clear the attribute once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/SysWatt.app
 ```
 
-Building from source skips that exchange entirely:
+Approving the app under System Settings → Privacy & Security works as well.
+
+Running from inside the DMG is a different trap, and the app refuses to fall into
+it: a login item saved from `/Volumes/...` names a path that stops existing at
+eject time, so `시작 시 실행` declines to write it and says what to do instead.
+Verified by launching the release image and clicking the item — no
+`~/Library/LaunchAgents` entry appeared, and the alert text named the fix.
+
+Building from source skips all of this:
 
 ```bash
 git clone https://github.com/yhzion/syswatt

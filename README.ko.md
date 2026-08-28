@@ -36,13 +36,23 @@ Mac의 실시간 소비 전력(W)을 **상태바**와 **데스크탑 위젯**에
 ## 설치
 
 [최신 릴리스](https://github.com/yhzion/syswatt/releases/latest)의 DMG 를 열어 `SysWatt.app`을
-`Applications`에 드래그하면 끝난다. 번들은 ad-hoc 서명이고 공증(notarize)은 Apple Developer ID 가
-있어야 하니, 내려받은 사본에는 quarantine 이 걸려 Gatekeeper 가 한 번 막는다. 처음에만 우클릭 →
-열기를 고르거나 속성을 지운다.
+`Applications`에 드래그하고, 거기서 실행한다. 마운트된 이미지 안에서 그냥 띄우면 안 된다.
+
+번들은 ad-hoc 서명이고 공증(notarize)은 Apple Developer ID 가 있어야 한다. 그런데 지금 macOS 에서
+그 조합은 예전의 "확인할 수 없는 개발자" 대화상자를 내지 않는다. 26.6 에서 실측: 격리 속성이 남은
+사본은 임시 읽기 전용 경로로 옮겨지고 `open` 은 0 으로 끝나며, 프로세스는 `_dyld_start` 에서 멈춰
+바이너리 이미지를 하나도 로드하지 못한다 — 즉 **화면에 아무것도 안 뜬다.** 한 번만 지운다.
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/SysWatt.app
 ```
+
+시스템 설정 → 개인 정보 보호 및 보안에서 "열기"를 허용하는 방법도 된다.
+
+DMG 안에서 실행하는 함정은 따로 있고, 앱이 거기 빠지기를 거부한다. `/Volumes/...` 에서 저장한
+시작 시 실행은 unmount 뒤에 사라지는 경로를 가리키기 때문에, 저장을 거부하고 이유를 알린다.
+릴리스 이미지를 마운트해 실제로 눌러 확인했다 — `~/Library/LaunchAgents` 에 항목이 생기지 않았고,
+대화상자가 할 일을 적어줬다.
 
 직접 빌리면 이 교환이 필요 없다.
 
