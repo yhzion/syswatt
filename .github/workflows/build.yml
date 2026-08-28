@@ -12,6 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 러너의 기본 toolchain 은 Command Line Tools 라 swift-format 이 없다
+      # ("unable to invoke subcommand: swift-format"). 개발에서 쓰는 Xcode 의
+      # 서식 엔진과 같은 것을 고른다.
+      - name: Select Xcode toolchain
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+          swift --version
+          swift format --version
+
       # 로컬 훅(scripts/git-hooks/pre-commit)과 같은 검사. 훅은 --no-verify 로
       # 우회할 수 있으므로 여기가 실제 게이트다.
       - name: Format check
