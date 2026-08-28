@@ -34,14 +34,19 @@ jobs:
       - name: Build and verify DMG
         run: ./scripts/make-dmg.sh
 
-      # CHANGELOG 에서 이번 릴리스에 해당하는 마디만 잘라 발행 메시지로 쓴다.
-      # 표준 형식은 "## 0.1.0 (2026-08-28)" 이므로 접두 문자열로 잡는다.
+      # CHANGELOG 에서 이번 릴리스 마디만 잘라 발행 메시지로 쓴다.
+      # awk 접두 비교로 했는데 0.1.1 은 노트가 빈 채로 나갔다. standard-version 이
+      # 쓰는 머리글이 "### [0.1.1](.../compare/v0.1.0...v0.1.1) (date)" 로 링크형이고,
+      # 그 안에서 분류 머리글(### Fixed)까지 같은 급을 쓰기 때문이다.
       - name: Collect release notes
         run: |
-          V="${GITHUB_REF_NAME#v}"
-          awk -v v="$V" 'index($0, "## " v " ")==1 {f=1; next} /^## / {f=0} f' CHANGELOG.md >notes.md
+          python3 scripts/changelog-notes.py "${GITHUB_REF_NAME#v}" >notes.md
           echo "--- notes ---"
           cat notes.md
+          if [ ! -s notes.md ]; then
+              echo "::error::발행 노트가 비어 있다. CHANGELOG 에 이 버전 마디가 있는지 확인"
+              exit 1
+          fi
 
       - name: Publish release
         env:
