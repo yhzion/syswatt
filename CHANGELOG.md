@@ -3,6 +3,13 @@
 버전은 시멘틱 버저닝을 따른다. `VERSION` 파일이 단일 진실이고, 릴리스는 `vX.Y.Z` 태그다.
 항목은 커밋 제목에서 생성되므로 `commit-msg` 훅의 Conventional Commits 검증이 곧 이 파일의 스키마다.
 
+### [0.1.1](https://github.com/yhzion/syswatt/compare/v0.1.0...v0.1.1) (2026-08-28)
+
+
+### Fixed
+
+* **설치:** 임시 볼륨에서 실행 중이면 시작 시 실행 저장을 거부한다 ([66d4da3](https://github.com/yhzion/syswatt/commit/66d4da3af889cd359676cf6d112799216ebd6391))
+
 ## 0.1.0 (2026-08-28)
 
 초기 구현은 컨벤션 도입 이전 커밋(`dd91cc2`)에 담겨 있어 자동으로 나오지 않는다. 그래서 아래
